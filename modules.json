@@ -1,0 +1,16 @@
+[
+  {
+    "id": "weather",
+    "title": "Wetter",
+    "path": "/wetter/",
+    "directory": "../wetterwarte/dist",
+    "icon": "weather"
+  },
+  {
+    "id": "radio",
+    "title": "Radio",
+    "path": "/radio/",
+    "directory": "../radio",
+    "icon": "radio"
+  }
+]

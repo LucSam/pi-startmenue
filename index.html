@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Raspberry Pi · Start</title><link rel="stylesheet" href="./src/style.css"></head>
+<body><main class="workbench">
+ <div class="preview-toolbar"><strong>RASPBERRY PI <small>Bildschirmvorschau</small></strong><div id="sizes" class="buttons"></div></div>
+ <section class="preview-settings"><div id="modes" class="buttons"></div><details><summary>Originalgröße kalibrieren</summary><p>Linie am Bildschirm mit einem Lineal messen. Bei anderem Monitor oder Browserzoom erneut prüfen.</p><div id="ruler">100 mm</div><label>Gemessen <input id="measured-mm" type="number" value="100" min="20" max="300"> mm</label> <button id="calibrate">Anwenden</button></details><p id="preview-note"></p></section>
+ <div class="device-wrap"><div class="device-stage"><article class="device" id="device">
+  <section id="home" class="screen"><header><h1>Start</h1><time class="local-time"></time><button data-open="standby">Standby</button></header><div id="tiles" class="tiles"></div><footer><span id="home-date"></span><button id="now-playing" data-open="radio" hidden></button></footer></section>
+  <div id="modules"></div>
+  <button id="standby" class="screen" hidden aria-label="Standby beenden, zum Startmenü"><svg viewBox="0 0 1000 295" aria-hidden="true"><text x="500" y="280" text-anchor="middle" textLength="980" lengthAdjust="spacingAndGlyphs" id="standby-time"></text></svg><span id="standby-date"></span><small>Berühren zum Starten</small></button>
+ </article></div></div>
+ <section class="preview-bottom"><label>Darstellung <select id="theme"><option value="auto">Auto · Sonnenstand</option><option value="light">Hell</option><option value="dark">Dunkel</option></select></label><label>Wetterdaten <select id="weather-mode"><option value="demo">Demo</option><option value="live">Echte Daten</option></select></label><label>Standby nach <select id="idle"><option value="0">Manuell</option><option value="5">5 Minuten</option><option value="10">10 Minuten</option><option value="30">30 Minuten</option></select></label><a href="?kiosk=1">Geräteansicht</a><p id="raster-status" role="status"></p></section>
+</main><script type="module" src="./src/main.js"></script></body></html>

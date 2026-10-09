@@ -1,0 +1,17 @@
+{
+  "name": "pi-startmenue",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/server.mjs --dev",
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/server.mjs",
+    "test": "node --test tests/server.test.mjs ../radio/server/metadata.test.mjs && node tests/browser.mjs",
+    "test:regression": "node tests/regression.mjs",
+    "test:safari": "node tests/browser.mjs webkit"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  }
+}
