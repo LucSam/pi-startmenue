@@ -24,8 +24,13 @@ try{
    if(layer==='air'){
     assert.equal(await page.locator('.air-point').count(),3);assert.equal(await page.locator('.regional-map image,.regional-map rect').count(),0,'Point data must not become an invented field');
     assert.match(await page.locator('.radar-side').textContent(),/Ortswerte.*PM₂,₅/s);
+    const points=await page.locator('.air-point').evaluateAll(nodes=>nodes.map(g=>{
+     const b=g.querySelector('circle').getBoundingClientRect(),t=g.querySelector('text').getBoundingClientRect(),m=g.closest('svg').getBoundingClientRect();
+     return {selected:g.dataset.selected==='true',diameter:b.width,inside:t.left>=m.left&&t.right<=m.right&&t.top>=m.top&&t.bottom<=m.bottom};
+    }));
+    for(const point of points){assert(Math.abs(point.diameter-(point.selected?16:12))<.2,`${size}: air point must retain its native size`);assert(point.inside,`${size}: air point label clipped`);}
    }
-   if(layer==='wind')assert.match(await page.locator('.radar-side').textContent(),/Wind >36 km\/h/);
+   if(layer==='wind'){assert.match(await page.locator('.radar-side').textContent(),/Wind >36 km\/h/);assert.match(await page.locator('.radar-side').textContent(),/Farblos:< 1 %/);}
    await page.locator('.device').screenshot({path:`test-results/map-${layer}-${size}-${engine}.png`});
    const id=layer==='rain'?'radar':'field',before=await page.locator(`#${id}-time`).inputValue();
    await page.locator(`[data-action=play-${id}]`).click();await page.waitForTimeout(1250);assert.notEqual(await page.locator(`#${id}-time`).inputValue(),before);

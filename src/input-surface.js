@@ -43,12 +43,33 @@ export function inputSurface(stage,source,changed){
   const control=target.closest('button,a,input,select,textarea,label,[data-year],[data-climate-cell]');if(!control||control.disabled||control.matches('input[type=range]'))return;
   if(control.matches('select,input:not([type=button]):not([type=submit]),textarea')){
    // Real, untransformed controls preserve Safari's keyboard, picker and caret.
-   surface.querySelector('.input-proxy')?.remove();
+   surface.querySelector('.input-proxy')?.blur();
    const proxy=control.cloneNode(true),r=control.getBoundingClientRect(),s=source(),content=s.element.getBoundingClientRect();proxy.classList.add('input-proxy');proxy.removeAttribute('id');proxy.removeAttribute('aria-hidden');proxy.removeAttribute('tabindex');
    Object.assign(proxy.style,{left:(r.left-content.left)/content.width*100+'%',top:(r.top-content.top)/content.height*100+'%',width:r.width/content.width*100+'%',height:r.height/content.height*100+'%',fontSize:Math.max(14,parseFloat(getComputedStyle(control).fontSize)*surface.clientWidth/s.width)+'px'});
    proxy.value=control.value;surface.append(proxy);proxy.focus();
-   for(const name of ['input','change'])proxy.addEventListener(name,()=>{control.value=proxy.value;control.dispatchEvent(new control.ownerDocument.defaultView.Event(name,{bubbles:true}));changed(false);});
-   proxy.addEventListener('click',e=>e.stopPropagation());proxy.addEventListener('keydown',e=>{if(e.key==='Enter'&&control.form){e.preventDefault();control.form.requestSubmit();proxy.remove();changed(true);}if(e.key==='Escape')proxy.blur();});proxy.addEventListener('blur',()=>{proxy.remove();changed(false);},{once:true});
+   // Removing a focused node fires blur synchronously in Chromium. Guard before
+   // removal so the blur handler cannot remove the same node recursively.
+   let closed=false;
+   const close=()=>{if(closed)return;closed=true;proxy.remove();changed(false);};
+   // A module may rebuild its DOM on change or while a data request completes.
+   // Resolve each event against the current control, not the detached original.
+   const doc=control.ownerDocument,id=control.id,tag=control.tagName,type=control.type;
+   const current=()=>{
+    const root=source().element;if(root?.ownerDocument!==doc)return;
+    const candidate=id?root.querySelector('#'+CSS.escape(id)):control;
+    if(candidate?.isConnected&&root.contains(candidate)&&candidate.tagName===tag&&candidate.type===type&&!candidate.disabled&&candidate.getClientRects().length)return candidate;
+   };
+   for(const name of ['input','change'])proxy.addEventListener(name,()=>{
+    const target=current();if(!target){close();changed(true);return;}
+    target.value=proxy.value;target.dispatchEvent(new doc.defaultView.Event(name,{bubbles:true}));
+    // A committed select gets a fresh proxy on its next opening, with current
+    // options, position and value. Text inputs keep their caret while editing.
+    if(name==='change'&&tag==='SELECT')close();
+    // A text field commits on blur during the click on the next field. Its
+    // value-only repaint must not block that same click as a structural change.
+    changed(name==='change'&&tag==='SELECT');
+   });
+   proxy.addEventListener('click',e=>e.stopPropagation());proxy.addEventListener('keydown',e=>{const target=current();if(e.key==='Enter'&&target?.form){e.preventDefault();target.form.requestSubmit();close();changed(true);}if(e.key==='Escape')proxy.blur();});proxy.addEventListener('blur',close,{once:true});
    if(proxy.tagName==='SELECT'){try{proxy.showPicker?.();}catch{/* Keyboard selection remains available. */}}
   }else{
    surface.querySelector('.input-proxy')?.blur();

@@ -1,6 +1,6 @@
-const CACHE='pi-display-shell-8e86e4a5660e';
+const CACHE='pi-display-shell-1a98116ab620';
 self.addEventListener('install',event=>event.waitUntil((async()=>{
- const cache=await caches.open(CACHE),files=['/','/modules.json','/src/style.css','/src/main.js','/src/preview.js','/src/input-surface.js','/radio/','/radio/src/main.js','/radio/src/style.css','/radio/src/stations.js','/wetter/'];
+ const cache=await caches.open(CACHE),files=['/','/modules.json','/src/style.css','/src/main.js','/src/preview.js','/src/input-surface.js','/radio/','/radio/src/main.js','/radio/src/bluetooth.js','/radio/src/style.css','/radio/src/stations.js','/wetter/'];
  const manifest=await fetch('/wetter/.vite/manifest.json').then(r=>r.json());
  for(const entry of Object.values(manifest)){files.push('/wetter/'+entry.file);for(const path of entry.css??[])files.push('/wetter/'+path);for(const path of entry.assets??[])files.push('/wetter/'+path);}
  await cache.addAll([...new Set(files)]);await self.skipWaiting();

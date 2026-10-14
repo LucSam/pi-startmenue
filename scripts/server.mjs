@@ -15,13 +15,17 @@ export async function createServer({dev=false}={}){
  const modules=JSON.parse(await readFile(resolve(root,'modules.json'),'utf8'));
  return http.createServer(async(req,res)=>{
   if(!['127.0.0.1','localhost','[::1]'].includes((req.headers.host??'').replace(/:\d+$/,''))){res.writeHead(403).end('Local access only');return;}
-  if(!['GET','HEAD'].includes(req.method)){res.writeHead(405).end();return;}
   const url=new URL(req.url,'http://localhost');let path;
   try{path=decodeURIComponent(url.pathname);}catch{res.writeHead(400).end();return;}
   if(path==='/'&&dev)res.setHeader('Cache-Control','no-store');
   if(path==='/health'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({ok:true,dev}));return;}
   if(path==='/modules.json'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(modules.map(({directory,...m})=>m)));return;}
   const module=modules.find(m=>path.startsWith(m.path));
+  if(module?.id==='radio'&&path===module.path+'api/bluetooth'){
+   const {serveBluetooth}=await import(pathToFileURL(resolve(root,module.directory,'server/bluetooth.mjs')));
+   await serveBluetooth(req,res);return;
+  }
+  if(!['GET','HEAD'].includes(req.method)){res.writeHead(405).end();return;}
   if(module?.id==='radio'&&path===module.path+'api/now-playing'){
    const {serveMetadata}=await import(pathToFileURL(resolve(root,module.directory,'server/metadata.mjs')));
    await serveMetadata(req,res,url);return;

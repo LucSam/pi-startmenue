@@ -63,6 +63,7 @@ function activity(){lastActivity=Date.now();}
 document.addEventListener('pointerdown',activity,{passive:true});document.addEventListener('keydown',e=>{activity();if(e.key==='Escape')open('home');});
 document.addEventListener('click',e=>{
  const button=e.target.closest('button');if(!button)return;
+ if(button.id==='reload-app'){location.reload();return;}
  if(button.dataset.open)open(button.dataset.open);
  if(button.dataset.size){settings.size=button.dataset.size;fit();}
  if(button.dataset.mode){preview.mode=button.dataset.mode;save('wetterwarte-display-preview',preview);fit();}
