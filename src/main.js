@@ -31,7 +31,10 @@ for(const m of modules){
 function configure(frame){frame.contentWindow?.postMessage({protocol:'pi-display-v1',type:'configure',settings},location.origin);}
 function applyTheme(){document.documentElement.dataset.theme=settings.theme==='auto'?solarTheme:settings.theme;}
 function fit(){
- stage.dataset.inputMode=kiosk?'layout':preview.mode;const p=profiles[settings.size];let scale=kiosk?Math.min(innerWidth/p.width,innerHeight/p.height):preview.mode==='physical'?widthMm(p)*preview.pxPerMm/p.width:preview.mode==='pixels'?2:Math.min(1,Math.max(280,innerWidth-48)/p.width);
+ // Chromium can keep a window wider than the display on small screens.
+ const availableWidth=kiosk?Math.min(innerWidth,screen.width||innerWidth):innerWidth,availableHeight=kiosk?Math.min(innerHeight,screen.height||innerHeight):innerHeight;
+ if(kiosk)document.documentElement.style.setProperty('--kiosk-width',`${availableWidth}px`);
+ stage.dataset.inputMode=kiosk?'layout':preview.mode;const p=profiles[settings.size];let scale=kiosk?Math.min(availableWidth/p.width,availableHeight/p.height):preview.mode==='physical'?widthMm(p)*preview.pxPerMm/p.width:preview.mode==='pixels'?2:Math.min(1,Math.max(280,innerWidth-48)/p.width);
  stage.style.width=`${p.width*scale}px`;stage.style.height=`${p.height*scale}px`;device.style.width=`${p.width}px`;device.style.height=`${p.height}px`;device.style.transform=`scale(${scale})`;device.dataset.size=settings.size;
  $('#sizes').innerHTML=Object.entries(profiles).map(([key,p])=>`<button data-size="${key}" aria-pressed="${key===settings.size}">${p.label}</button>`).join('');
  $('#modes').innerHTML=[['layout','Arbeitsansicht'],['physical','Originalgröße'],['pixels','Pixelraster 2×']].map(([key,label])=>`<button data-mode="${key}" aria-pressed="${key===preview.mode}">${label}</button>`).join('');

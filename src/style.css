@@ -8,3 +8,5 @@
 
 .display-input-surface{position:absolute;inset:0;z-index:5;touch-action:none;cursor:default}.display-input-surface .input-proxy{position:absolute;box-sizing:border-box;min-height:0;min-width:0;margin:0;padding:4px 6px;color:var(--text);background:var(--surface);border:2px solid var(--accent);border-radius:5px;font-family:Helvetica,Arial,sans-serif;font-weight:600;z-index:1}
 .device-stage[data-input-mode=layout]>.display-input-surface{pointer-events:none}
+.kiosk .workbench{width:var(--kiosk-width,100%);margin:0}
+.kiosk #standby:focus-visible{outline:none}
