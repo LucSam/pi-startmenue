@@ -3,6 +3,7 @@ import {readFile,stat,realpath} from 'node:fs/promises';
 import {resolve,dirname,extname,sep} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {spawn} from 'node:child_process';
+import {createSystemHandler} from './system.mjs';
 
 export const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.jpg':'image/jpeg','.png':'image/png','.txt':'text/plain; charset=utf-8','.md':'text/plain; charset=utf-8'};
@@ -11,8 +12,9 @@ export async function safeFile(directory,path){
  if(target!==base&&!target.startsWith(base+sep))throw Error('Invalid path');
  return (await stat(target)).isFile()?target:resolve(target,'index.html');
 }
-export async function createServer({dev=false}={}){
+export async function createServer({dev=false,systemControl}={}){
  const modules=JSON.parse(await readFile(resolve(root,'modules.json'),'utf8'));
+ const serveSystem=createSystemHandler({control:systemControl});
  return http.createServer(async(req,res)=>{
   if(!['127.0.0.1','localhost','[::1]'].includes((req.headers.host??'').replace(/:\d+$/,''))){res.writeHead(403).end('Local access only');return;}
   const url=new URL(req.url,'http://localhost');let path;
@@ -20,6 +22,7 @@ export async function createServer({dev=false}={}){
   if(path==='/'&&dev)res.setHeader('Cache-Control','no-store');
   if(path==='/health'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({ok:true,dev}));return;}
   if(path==='/modules.json'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(modules.map(({directory,...m})=>m)));return;}
+  if(path==='/api/system'){await serveSystem(req,res);return;}
   const module=modules.find(m=>path.startsWith(m.path));
   if(module?.id==='radio'&&path===module.path+'api/bluetooth'){
    const {serveBluetooth}=await import(pathToFileURL(resolve(root,module.directory,'server/bluetooth.mjs')));

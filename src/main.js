@@ -8,6 +8,7 @@ document.documentElement.classList.toggle('kiosk',kiosk);
 const $=s=>document.querySelector(s),device=$('#device'),stage=$('.device-stage');
 const modules=await fetch('./modules.json').then(r=>r.json());
 let active='home',lastActivity=Date.now(),solarTheme='light',captureTimer,captureVersion=0,radioPlaying=false;
+let powerSupported=false,powerAllowed=false,powerBusy=false,powerAccepted=false,systemLoading=false;
 const frames=new Map(),observers=new Map();
 const source=()=>({element:(frames.has(active)?frames.get(active).contentDocument?.querySelector('.device'):device)??device,...profiles[settings.size]});
 inputSurface(stage,source,structural=>{activity();requestCapture(structural);});
@@ -30,6 +31,35 @@ for(const m of modules){
 }
 function configure(frame){frame.contentWindow?.postMessage({protocol:'pi-display-v1',type:'configure',settings},location.origin);}
 function applyTheme(){document.documentElement.dataset.theme=settings.theme==='auto'?solarTheme:settings.theme;}
+const powerDialogOpen=()=>!$('#power-dialog').hidden;
+async function loadSystemState(){
+ if(systemLoading||powerBusy||powerAccepted)return;systemLoading=true;
+ try{
+  const response=await fetch('/api/system',{cache:'no-store',signal:AbortSignal.timeout(5000)});
+  if(!response.ok)throw Error();const state=await response.json();
+  powerSupported=state.supported===true;powerAllowed=powerSupported&&state.canPowerOff===true;
+  $('#power-unavailable').textContent='Noch nicht eingerichtet';
+ }catch{powerAllowed=false;$('#power-unavailable').textContent='Verbindung nicht verfügbar';}
+ finally{systemLoading=false;$('#power-control').hidden=!powerSupported;$('#power-open').disabled=!powerAllowed;$('#power-unavailable').hidden=powerAllowed;requestCapture(true);}
+}
+function showPowerDialog(){
+ if(!powerAllowed||powerBusy||powerAccepted)return;
+ $('#power-dialog').hidden=false;$('#home').inert=true;$('#power-message').textContent='Radio und Anwendungen werden beendet.';$('#power-message').classList.remove('error');$('#power-cancel').focus();requestCapture(true);
+}
+function closePowerDialog(){
+ if(powerBusy||powerAccepted)return;
+ $('#power-dialog').hidden=true;$('#home').inert=false;$('#power-open').focus();activity();requestCapture(true);
+}
+async function powerOff(){
+ if(!powerDialogOpen()||!powerAllowed||powerBusy||powerAccepted)return;
+ powerBusy=true;$('#power-cancel').disabled=true;$('#power-confirm').disabled=true;$('#power-message').classList.remove('error');$('#power-message').textContent='Herunterfahren wird angefordert …';$('#power-dialog').focus();requestCapture(true);
+ try{
+  const response=await fetch('/api/system',{method:'POST',headers:{'Content-Type':'application/json','X-Pi-System':'1'},body:JSON.stringify({action:'poweroff'}),signal:AbortSignal.timeout(10000)});
+  if(response.status!==202){const result=await response.json().catch(()=>({}));throw Error(typeof result.error==='string'?result.error:'Herunterfahren nicht möglich. Bitte erneut versuchen.');}
+  powerAccepted=true;$('#power-message').textContent='Herunterfahren angefordert. Bitte warten, bis der Pi ausgeschaltet ist.';
+ }catch(error){$('#power-message').classList.add('error');$('#power-message').textContent=error.name==='TimeoutError'||error.name==='TypeError'?'Keine Bestätigung erhalten. Bitte Verbindung prüfen.':error.message;}
+ finally{powerBusy=false;$('#power-cancel').disabled=powerAccepted;$('#power-confirm').disabled=powerAccepted;requestCapture(true);}
+}
 function fit(){
  // Chromium can keep a window wider than the display on small screens.
  const availableWidth=kiosk?Math.min(innerWidth,screen.width||innerWidth):innerWidth,availableHeight=kiosk?Math.min(innerHeight,screen.height||innerHeight):innerHeight;
@@ -43,11 +73,13 @@ function fit(){
  for(const frame of frames.values())configure(frame);save('pi-startmenue',settings);requestCapture(true);
 }
 function open(id){
+ if(powerDialogOpen())return;
  if(!['home','standby',...frames.keys()].includes(id))return;
  active=id;lastActivity=Date.now();$('#home').hidden=id!=='home';$('#standby').hidden=id!=='standby';for(const [key,frame] of frames)frame.hidden=key!==id;document.querySelectorAll('[data-error-module]').forEach(panel=>panel.hidden=panel.dataset.errorModule!==id);
  document.title=`Raspberry Pi · ${id==='home'?'Start':id==='standby'?'Standby':modules.find(m=>m.id===id)?.title}`;
  if(id==='standby')$('#standby').focus();else if(id==='home')$('#home [data-open]')?.focus();
  tick();requestCapture(true);
+ if(id==='home')void loadSystemState();
 }
 function requestCapture(structural=false){
  clearTimeout(captureTimer);captureVersion++;
@@ -61,11 +93,28 @@ async function capture(){
  try{const canvas=await snapshot(element,p.width,p.height,p.rgb565);if(version!==captureVersion)return;canvas.className='native-display-canvas';canvas.setAttribute('aria-hidden','true');const previous=stage.querySelector('canvas');if(previous)previous.replaceWith(canvas);else stage.insertBefore(canvas,stage.querySelector('.display-input-surface'));delete stage.dataset.rasterPending;$('#raster-status').textContent=`${p.width} × ${p.height} native Rasterpixel${p.rgb565?' · RGB565':''} · Maus / Touch aktiv`;}
  catch{if(version===captureVersion){stage.querySelector('canvas')?.remove();delete stage.dataset.rasterPending;$('#raster-status').textContent='Pixelansicht nicht verfügbar; skalierte Browseransicht sichtbar.';}}
 }
-function tick(){const time=clock();if($('#standby-time').textContent!==time){$('#standby-time').textContent=time;$('.local-time').textContent=time;$('#home-date').textContent=date();$('#standby-date').textContent=date();requestCapture();}if(settings.idle>0&&active!=='standby'&&Date.now()-lastActivity>settings.idle*60000)open('standby');}
+function tick(){const time=clock();if($('#standby-time').textContent!==time){$('#standby-time').textContent=time;$('.local-time').textContent=time;$('#home-date').textContent=date();$('#standby-date').textContent=date();requestCapture();}if(settings.idle>0&&active!=='standby'&&!powerDialogOpen()&&Date.now()-lastActivity>settings.idle*60000)open('standby');}
 function activity(){lastActivity=Date.now();}
-document.addEventListener('pointerdown',activity,{passive:true});document.addEventListener('keydown',e=>{activity();if(e.key==='Escape')open('home');});
+document.addEventListener('pointerdown',activity,{passive:true});document.addEventListener('keydown',e=>{
+ activity();
+ if(powerDialogOpen()){
+  if(e.key==='Escape'){e.preventDefault();closePowerDialog();}
+  if(e.key==='Tab'){
+   const buttons=[...$('#power-dialog').querySelectorAll('button:not(:disabled)')],first=buttons[0],last=buttons.at(-1);
+   if(!first){e.preventDefault();$('#power-dialog').focus();}
+   else if(e.shiftKey&&(document.activeElement===first||!$('#power-dialog').contains(document.activeElement))){e.preventDefault();last.focus();}
+   else if(!e.shiftKey&&(document.activeElement===last||!$('#power-dialog').contains(document.activeElement))){e.preventDefault();first.focus();}
+  }
+  return;
+ }
+ if(e.key==='Escape')open('home');
+});
 document.addEventListener('click',e=>{
  const button=e.target.closest('button');if(!button)return;
+ if(powerDialogOpen()&&!button.closest('#power-dialog'))return;
+ if(button.id==='power-open'){showPowerDialog();return;}
+ if(button.id==='power-cancel'){closePowerDialog();return;}
+ if(button.id==='power-confirm'){void powerOff();return;}
  if(button.id==='reload-app'){location.reload();return;}
  if(button.dataset.open)open(button.dataset.open);
  if(button.dataset.size){settings.size=button.dataset.size;fit();}
@@ -88,6 +137,6 @@ window.addEventListener('message',e=>{
  if(e.data.type==='radio-state'){radioPlaying=e.data.playing===true;$('#now-playing').hidden=!radioPlaying;$('#now-playing').textContent=`Radio · ${String(e.data.station??'').slice(0,60)}`;}
  if(e.data.type==='rendered'&&active===id)requestCapture();
 });
-window.addEventListener('resize',fit);setInterval(tick,1000);applyTheme();fit();tick();
+window.addEventListener('resize',fit);setInterval(tick,1000);applyTheme();fit();tick();void loadSystemState();
 // The production shell caches all three applications. A reload cannot resume audio without a user gesture.
 fetch('/health').then(r=>r.json()).then(({dev})=>{if(!dev&&'serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');}).catch(()=>{});
